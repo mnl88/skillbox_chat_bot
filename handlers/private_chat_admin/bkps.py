@@ -208,7 +208,8 @@ async def show_info_about_record(message: types.Message, state: FSMContext):
                 )
             else:
                 await message.answer(
-                    text=f'На {datetime_now_str} записей на тренировки с трениром Стоговая Анастасия не найдено'
+                    text=f'Настя, на {datetime_now_str} '
+                         f'записей на тренировки с тобой в качестве основного тренера отсутствуют!'
                     # parse_mode=types.ParseMode.HTML,
                     # disable_web_page_preview=True,
                     # reply_markup=inline_kb_hide_details
