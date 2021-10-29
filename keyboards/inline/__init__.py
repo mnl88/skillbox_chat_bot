@@ -1,6 +1,7 @@
 from .start_kb import inline_kb_start_is_reg
 from .start_kb import inline_kb_start_is_not_reg
 from .start_kb import inline_kb_editing_profile
+from .show_hide_details_for_stogova import inline_kb_show_details, inline_kb_hide_details
 # from .kb1 import inline_kb1_shoe_profile_or_stats
 # from .kb_to_reg import inline_kb_to_reg
 # from .kb_edit_data import inline_kb_edit_data

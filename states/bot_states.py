@@ -29,3 +29,10 @@ class RegPlayerState(StatesGroup):
     showing_person_data = State()
     showing_statistics = State()
     edit_profile = State()
+
+
+class StogovaScheduleState(StatesGroup):
+    show_details = State
+    hide_details = State
+
+
