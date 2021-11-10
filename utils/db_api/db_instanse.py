@@ -129,6 +129,9 @@ class TG_Account(DeclarativeBase):
                     logger.error(f'Ошибка! удалить запись {self} в БД не получилось. {err}')
 
 
+
+
+
 class B4U_Account(DeclarativeBase):
     __tablename__ = 'b4u_accounts'
 
@@ -202,7 +205,6 @@ class B4U_Account(DeclarativeBase):
 
     async def read_by_id(self, db_engine):
         """Проверяем, есть ли такой ТГ - Аккаунт в БД"""
-
         async_session = sessionmaker(db_engine, expire_on_commit=False, class_=AsyncSession)
         async with async_session() as session:
             result = await session.execute(select(B4U_Account).where(B4U_Account.id == self.id))
@@ -252,12 +254,16 @@ class B4U_Account(DeclarativeBase):
             else:
                 logger.error(f'По указанному ID нет записи в базе данных, спарсить такой аккаунт тоже не получается')
         else:
-            delta_minutes = (datetime.now()-row.modified_at).total_seconds()/60
+            if not row.modified_at:
+                delta_minutes = minutes_for_update
+            else:
+                delta_minutes = (datetime.now()-row.modified_at).total_seconds()/60
             if b4u_form_site:
-                if delta_minutes > minutes_for_update:
+                if delta_minutes >= minutes_for_update:
                     await b4u_form_site.update_all(db_engine)
 
         return await self.read_by_id(db_engine)
+
 
 class Badminton_player(DeclarativeBase):
     __tablename__ = "badminton_players"
@@ -268,6 +274,9 @@ class Badminton_player(DeclarativeBase):
     tg_id = Column(Integer, ForeignKey('tg_accounts.id'), unique=False, nullable=False)
     vk_id = Column(Integer, unique=False)
     b4u_id = Column(Integer, ForeignKey('b4u_accounts.id'), unique=False)
+
+    # id на сайте федерации бадминтона РФ http://www.info.badm.spb.ru/profile/1281
+    fed_badm_id = Column(Integer, unique=False)
 
     created_at = Column('created_at', TIMESTAMP, default=datetime.now())
     modified_at = Column('modified_at', TIMESTAMP, default=datetime.now())
@@ -426,6 +435,21 @@ async def insert_people(engine):
         await session.commit()
 
 
+async def fetch_all_b4u_accounts(db_engine) -> [B4U_Account]:
+    """Проверяем, есть ли такой ТГ - Аккаунт в БД"""
+
+    async_session = sessionmaker(db_engine, expire_on_commit=False, class_=AsyncSession)
+    async with async_session() as session:
+        # session: AsyncSession
+        # session.execute()
+        result2 = await session.execute(select(B4U_Account))
+        rows = result2.scalars().fetchall()
+        # result = await session.execute(select(B4U_Account).where(B4U_Account.id == self.id))
+        # row = result.scalars().one_or_none()
+        # logger.info(f'Получена запись {row2}')
+        return rows
+
+
 async def add_member_using_tg_id(engine: AsyncEngine, tg_account: TG_Account):
     """Добавляем участника"""
 
@@ -555,15 +579,18 @@ async def update_b4u_in_bd(engine: AsyncEngine, b4u_account: B4U_Account):
 
 async def async_main():
     db = await start_db()
-    b4u = await B4U_Account(id=17284).smart_get(db, minutes_for_update=0.01)
-    print(b4u)
+    b4u_s = await fetch_all_b4u_accounts(db)
+    # b4u = await B4U_Account(id=17284).smart_get(db, minutes_for_update=0.01)
+    for account in b4u_s:
+        b4u = await B4U_Account(id=account.id).smart_get(db, minutes_for_update=0.01)
+        print(b4u)
+    # print(b4u_s)
 
     # for i in range(10000):
     #     b4u = B4U_Account(id=i+1)
     #     b4u_2 = await b4u.get_from_site_by_id()
     #     if b4u_2:
     #         await b4u_2.create(db)
-
 
 
 async def create_test_b4u_accs(engine: AsyncEngine):

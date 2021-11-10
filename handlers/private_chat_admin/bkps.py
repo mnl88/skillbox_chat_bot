@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 stogova_id = 525157051
 varlamova_id = 818059455
 sviridenko_id = 1057050334  # Свириденко
+natasha_vk_id = 14496783
 ps_staff_ids = [stogova_id, varlamova_id, sviridenko_id]
 
 from emoji import emojize
@@ -139,16 +140,14 @@ async def show_info_about_record(message: types.Message, state: FSMContext):
         await msg.delete()
 
 
-@dp.message_handler(user_id=[*admins, stogova_id], commands="ps", state=(['*', None]))
+@dp.message_handler(user_id=[*admins, stogova_id], commands=['ps', 'nastya', 'stogova'], state=(['*', None]))
 async def show_info_about_record(message: types.Message, state: FSMContext):
     await types.ChatActions.typing()
     msg = await message.answer('Ваш запрос обрабатывается, подождите...')
     try:
-        # db = await start_db()
-        # player = await Badminton_player(tg_id=message.from_user.id).read_by_tg_id(db)
         # player: Badminton_player
         group_id = 116868448
-        board = await get_topics_and_calculate_messages_and_likes(liker_users_ids=[14496783, ], group_id=group_id)
+        board = await get_topics_and_calculate_messages_and_likes(liker_users_ids=[natasha_vk_id, ], group_id=group_id)
 
         is_records_exist = False
 
@@ -200,6 +199,7 @@ async def show_info_about_record(message: types.Message, state: FSMContext):
                 data['message_id'] = message.message_id
 
             if is_records_exist:
+                await message.answer_sticker(sticker='CAACAgEAAxkBAAEMis9hi5BxR6L-Tx8S9kU1mQIYbf6KigACaQgAAr-MkASxL4G2gv6QQSIE')
                 await message.answer(
                     text='\n'.join(part_of_text_without_details),
                     parse_mode=types.ParseMode.HTML,
@@ -207,16 +207,18 @@ async def show_info_about_record(message: types.Message, state: FSMContext):
                     reply_markup=inline_kb_hide_details
                 )
             else:
+                await message.answer_sticker(
+                    sticker='CAACAgIAAxkBAAEMirFhi4xnQ3PJAhJHsGeRQZkp_0_7EgACoAEAAooSqg4K2hVuYPTufiIE')
                 await message.answer(
                     text=f'Настя, на {datetime_now_str} '
-                         f'записей на тренировки с тобой в качестве основного тренера отсутствуют!'
+                         f'записи на тренировки с тобой в качестве основного тренера отсутствуют!'
                     # parse_mode=types.ParseMode.HTML,
                     # disable_web_page_preview=True,
                     # reply_markup=inline_kb_hide_details
                 )
 
     except Exception as e:
-        logger.error(e)
+        logger.error(f'Ошибка - {e}')
         msg2 = await message.answer('что-то пошло не так, возможно, у вас не правильно указан ВК ID')
         await asyncio.sleep(20)
         await message.delete()

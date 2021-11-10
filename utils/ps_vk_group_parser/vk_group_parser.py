@@ -1,13 +1,14 @@
 import asyncio
+import datetime
 import json
 import logging
 import os
+import re
 import time
 from urllib.parse import urlparse
+
 import httpx
 from dotenv import load_dotenv
-import re
-import datetime
 
 load_dotenv()
 
@@ -70,15 +71,22 @@ async def parse_board_with_all_topics_comments_and_likes(group_id: int):
                         logger.error('topics count is not equal to items!!')
 
     async def add_comments_to_topics(topics: dict) -> dict:
+
+        # ограничение vk api, нельзя получить более 100 сообщений из одной темы за раз!!!
+        max_count_of_comments = 100
+
         blocks = cut_list_by_size(topics['items'])
+        list_of_comments = []
         for block in blocks:
             vk_script = 'return ['
             for topic in block:
-                vk_script += 'API.board.getComments({"group_id": ' + str(
-                    topics['group_id']) + ', "topic_id": ' + str(topic['id']) + ', "need_likes": 1}),'
+                vk_script += 'API.board.getComments(' \
+                             '{"group_id": ' + str(topics['group_id']) \
+                             + ', "topic_id": ' + str(topic['id']) \
+                             + ', "count": ' + str(max_count_of_comments) \
+                             + ', "need_likes": 1}),'
             vk_script += '];'
             # print(vk_script)
-            list_of_comments = []
             async with httpx.AsyncClient() as client:
                 params = {
                     'code': vk_script,
@@ -92,13 +100,19 @@ async def parse_board_with_all_topics_comments_and_likes(group_id: int):
                     if 'error' in r_json:
                         logger.error(r_json)
                     if 'response' in r_json:
+                        # print(len(r_json['response']))
                         for item in r_json['response']:
-                            # print(item, end='\n'*3)
+                            if item['count'] == max_count_of_comments:
+                                logger.error(f'ограничение vk api, нельзя получить более 100 сообщений из одной темы за раз!!!')
+                            # print(item['count'], end='\n'*3)
                             list_of_comments.append(item)
-            for i, topic in enumerate(topics['items']):
-                for j, comments in enumerate(list_of_comments):
-                    if i == j:
-                        topic.update({'comments': comments})
+
+        for i, topic in enumerate(topics['items']):
+            for j, comments in enumerate(list_of_comments):
+                if i == j:
+                    # print(comments, end='\n\n')
+                    topic.update({'comments': comments})
+
         return topics
 
         # for topic in list_of_comments:
@@ -181,9 +195,10 @@ async def parse_board_with_all_topics_comments_and_likes(group_id: int):
     async def add_likes_to_comments(topics_with_comments: dict):
         list_of_liked_comments_ids = []
         for topic in topics_with_comments['items']:
-            for comment in topic['comments']['items']:
-                if comment['likes']['count'] > 0:
-                    list_of_liked_comments_ids.append(comment['id'])
+            if topic['comments']['count'] > 0:
+                for comment in topic['comments']['items']:
+                    if comment['likes']['count'] != 0:
+                        list_of_liked_comments_ids.append(comment['id'])
         blocks = cut_list_by_size(list_of_liked_comments_ids)
         list_of_likes = []
         for block in blocks:
@@ -344,6 +359,9 @@ async def parse_board_with_all_topics_comments_and_likes(group_id: int):
 
     # получаем список всех обсуждений и комментариев
     topics_with_comments = await add_comments_to_topics(topics=topics)
+
+    # with open('good_data.json', 'w') as fp:
+    #     json.dump(topics_with_comments, fp)
 
     # получаем список всех обсуждений, комментариев и лайков
     topics_with_comments_and_likes = await add_likes_to_comments(topics_with_comments=topics_with_comments)
@@ -573,9 +591,9 @@ async def get_topics_and_calculate_messages_and_likes(liker_users_ids: list, gro
 
 
 async def main_async():
-    # board = await parse_board_with_all_topics_comments_and_likes(group_id=116868448)
+    board = await parse_board_with_all_topics_comments_and_likes(group_id=116868448)
 
-    await get_topics_and_calculate_messages_and_likes(liker_users_ids=[14496783, ], group_id=116868448)
+    # await get_topics_and_calculate_messages_and_likes(liker_users_ids=[14496783, ], group_id=116868448)
     # await get_comments_by_user_id(group_id=116868448, user_vk_id=2680992)
 
 
