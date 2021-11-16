@@ -18,15 +18,15 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S')
 
 logger = logging.getLogger(__name__)
+URL = urlparse('https://api.vk.com/')
+
+
+async def smart_sleep_for_vk_api():
+    await asyncio.sleep(0.4)
+    # print(time.time()-start_time, 'seconds')
 
 
 async def parse_board_with_all_topics_comments_and_likes(group_id: int):
-    URL = urlparse('https://api.vk.com/')
-
-    async def smart_sleep_for_vk_api():
-        await asyncio.sleep(0.4)
-        # print(time.time()-start_time, 'seconds')
-
     def cut_list_by_size(lst: list, size=25) -> list:
         """
 
@@ -582,19 +582,96 @@ async def get_topics_and_calculate_messages_and_likes(liker_users_ids: list, gro
 
             topics_list.append(topic_dict)
 
-
-
-    with open('yes.json', 'w') as fp:
-        json.dump(topics_list, fp)
+    # with open('yes.json', 'w') as fp:
+    #     json.dump(topics_list, fp)
 
     return topics_list
 
 
-async def main_async():
-    board = await parse_board_with_all_topics_comments_and_likes(group_id=116868448)
+async def get_several_topics(topic_ids: list) -> list:
+    several_topics = []
+    topics_ids_str = ''
+    for topic_id in topic_ids:
+        topics_ids_str += str(topic_id) + ', '
+        several_topics.append(await parse_board_with_all_topics_comments_and_likes(topic_id))
 
+    groups = None
+    async with httpx.AsyncClient() as client:
+        params = {
+            'group_ids': topics_ids_str,
+            # 'fields': '',
+            'v': 5.81,
+            'access_token': os.getenv('api_token')
+        }
+        await smart_sleep_for_vk_api()
+        response = await client.get(url=URL.geturl() + f'/method/groups.getById', params=params)
+        if response.status_code == 200:
+            r_json = response.json()
+            if 'error' in r_json:
+                logger.error(r_json)
+            if 'response' in r_json:
+                groups = r_json['response']
+
+    for topic in several_topics:
+        for group in groups:
+            if group['id'] == topic['group_id']:
+                topic.update({'group': group})
+
+    return several_topics
+
+
+async def get_comments_in_several_topics_by_vk_user_id(topic_ids: list, user_vk_id: int) -> list:
+    """
+    Возвращает список записей заданного пользователя ВК
+
+    :param group_id: ID группы ВК (int, без минуса)
+    :param user_vk_id: ID пользователя ВК (int)
+    :return:
+    """
+
+    vk_groups = await get_several_topics(topic_ids=topic_ids)
+
+    my_board = []
+    for board in vk_groups:
+        my_topics = []
+        for topic in board['items']:
+            my_comments = []
+            for comment in topic['comments']['items']:
+                if comment['from_id'] == user_vk_id:
+                    my_comments.append(comment)
+            if my_comments:
+                my_topics.append({
+                    'topic_id': topic['id'],
+                    'topic_title': topic['title'],
+                    'topic_updated': topic['updated'],
+                    'topic_created': topic['created'],
+                    'comments': my_comments,
+                })
+        if my_topics:
+            my_board.append({
+                'group': board['group'],
+                'topics': my_topics
+            })
+
+    # with open('my_board.json', 'w') as fp:
+    #     json.dump(my_board, fp)
+    # print(user_comments)
+    return my_board
+
+
+async def main_async():
+    # messages = await get_comments_in_several_topics_by_vk_user_id(user_vk_id=2680992)
+    # print(messages)
+    # board = await parse_board_with_all_topics_comments_and_likes(group_id=116868448)
     # await get_topics_and_calculate_messages_and_likes(liker_users_ids=[14496783, ], group_id=116868448)
     # await get_comments_by_user_id(group_id=116868448, user_vk_id=2680992)
+    pass
+
+
+    # with open('yes.json', 'w') as fp:
+    #     json.dump(a, fp)
+
+    # print(a)
 
 
 if __name__ == '__main__':

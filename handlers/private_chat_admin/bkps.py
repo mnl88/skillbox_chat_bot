@@ -1,3 +1,4 @@
+import json
 import asyncio
 import logging
 import datetime
@@ -11,9 +12,10 @@ from loader import dp, bot
 from states.bot_states import StogovaScheduleState
 from utils.db_api.db_instanse import Badminton_player
 from utils.db_api.db_instanse import start_db
-from utils.ps_vk_group_parser.vk_group_parser import get_comments_by_user_id
+from utils.ps_vk_group_parser.vk_group_parser import get_comments_by_user_id, \
+    get_comments_in_several_topics_by_vk_user_id
 from utils.ps_vk_group_parser.vk_group_parser import get_topics_and_calculate_messages_and_likes
-
+import emoji
 
 import re
 
@@ -247,4 +249,61 @@ async def ys_boss(call: types.CallbackQuery, state: FSMContext):
         disable_web_page_preview=True,
         reply_markup=keyboard
     )
+
+
+# при нажатии /me
+@dp.message_handler(commands=['me'], state=['*', None])
+# @dp.message_handler(commands="me", state='*')
+async def command_me(message: types.Message, state: FSMContext):
+    logger.info(f'Пользователь {message.from_user.full_name} (ID: {message.from_user.id}) нажал команду ME')
+    await types.ChatActions.typing()
+    msg = await message.answer('Ваш запрос обрабатывается, подождите...')
+    vk_group_id_volley = 64612773  # ID группы Волейбол на Ваське
+    vk_group_id_pritjazhenie = 116868448  # ID группы Притяжение
+    vk_group_id_craft = 190120334  # ID группы Крафт
+    vk_group_ids = [vk_group_id_volley, vk_group_id_pritjazhenie, vk_group_id_craft]
+
+    try:
+        db = await start_db()
+        player = await Badminton_player(tg_id=message.from_user.id).read_by_tg_id(db)
+        player: Badminton_player
+        board = await get_comments_in_several_topics_by_vk_user_id(topic_ids=vk_group_ids, user_vk_id=player.vk_id)
+        # with open('my_board.json', 'w') as fp:
+        #     json.dump(board, fp)
+        if board:
+            text = [f'Список записей на {datetime.datetime.now().strftime("%X")}:']
+            for group in board:
+                group_url = 'https://vk.com/' + str(group['group']['screen_name'])
+                group_title = group['group']['name'].upper()
+                text.append(
+                    f'<a href="{group_url}">{group_title}</a>'
+                )
+                for topic in group['topics']:
+                    topic_url = 'https://vk.com/topic-' + str(group['group']['id']) + '_' + str(topic['topic_id'])
+                    topic_title = topic['topic_title'].strip()[:50]
+                    text.append(
+                        f'<a href="{topic_url}">{topic_title}</a>'
+                    )
+
+                    for i, comment in enumerate(topic['comments']):
+                        comment_text = comment['text']
+                        text.append(
+                            # f'<a href="{url}">"{topic_title}"</a>'
+                            f'{i + 1}) {comment_text}'
+                        )
+                text.append('')
+            full_text = '\n'.join(text)
+            await message.answer(
+                text=full_text,
+                parse_mode=types.ParseMode.HTML,
+                disable_web_page_preview=True
+            )
+    except Exception as e:
+        print(e)
+        # msg2 = await message.answer('что-то пошло не так, возможно, у вас не правильно указан ВК ID')
+        # await asyncio.sleep(20)
+        # await message.delete()
+        # await msg2.delete()
+    finally:
+        await msg.delete()
 
