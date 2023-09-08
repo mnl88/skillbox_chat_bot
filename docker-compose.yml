@@ -1,23 +1,12 @@
-version: "3.10"
-
-#volumes:
-#        db_volume:
-#                name: Postges_volume
-
+version: '3.8'
 
 services:
-#        postgres:
-#                image: postgres
-#                container_name: Postgres_DB
-#                restart:  always
-#                environment:
-#                        - TZ=Europe/Moscow
-#                        - POSTGRES_USER=${POSTGRES_USER}
-#                        - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-#                        - POSTGRES_DB=${POSTGRES_DB}
-#                ports:
-#                        - 5432:5432
-#                volumes:
-#                        - db_volume:/var/lib/postgresql/data
-        badminton_script_bot_tg:
 
+  skillbox_bot:
+    build: ./bot
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./.env
+    expose:
+      - "8080"
