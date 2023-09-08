@@ -1,22 +1,21 @@
 import logging
-import asyncio
 
-from aiogram import Router, types, html, F
-
-from middlewares.message_counter import CounterMiddleware
+from aiogram import Router, html, F
+from aiogram.filters import ChatMemberUpdatedFilter, IS_MEMBER, IS_NOT_MEMBER
+from aiogram.types import ChatMemberUpdated
 
 logger = logging.getLogger(__name__)
 router = Router()
-router.message.filter(F.chat.type.in_({"group", "supergroup"}))
 
 
-# @router.message(F.chat.type.in_({"group", "supergroup"}), commands="id")
-@router.message(content_types=[types.ContentType.NEW_CHAT_MEMBERS])
-async def new_user_joined(message: types.Message):
-    for new_member in message.new_chat_members:
-        first_name = new_member.first_name  # Не может быть пустым
-        last_name = new_member.last_name  # Может быть пустым
-        username = new_member.username  # Может быть пустым
+@router.chat_member(ChatMemberUpdatedFilter(IS_NOT_MEMBER >> IS_MEMBER))
+async def on_user_leave(event: ChatMemberUpdated):
+    await event.answer('Привет, дорогой друг')
+    user = event.from_user
+    if user:
+        first_name = user.first_name  # Не может быть пустым
+        last_name = user.last_name  # Может быть пустым
+        username = user.username  # Может быть пустым
         mention = ''
         if username:
             mention = ' @' + username
@@ -29,10 +28,5 @@ async def new_user_joined(message: types.Message):
             'Зачастую мы оставляем в закреплённых комментариях важную и нужную информацию и/или опросы\n',
             'По возможности, ознакомься с несколькими последними =)',
         ]
-        welcome_message = await message.answer('\n'.join(text))
+        welcome_message = await event.answer('\n'.join(text))
 
-
-# @router.message()
-# async def aaa(update, **kwargs):
-#     for items in kwargs.items():
-#         print(f"{items}")
